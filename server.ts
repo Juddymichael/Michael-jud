@@ -397,7 +397,7 @@ app.post('/api/coach/chat', async (req, res) => {
             }
 
             turnContents.push({
-              role: 'tool',
+              role: 'user',
               parts: toolResponseParts,
             });
           }
