@@ -334,6 +334,7 @@ app.post('/api/coach/chat', async (req, res) => {
     ].filter((m, idx, arr) => arr.indexOf(m) === idx);
 
     let geminiError: any = !hasValidGeminiKey();
+    let debugLastError: string | null = !hasValidGeminiKey() ? 'GEMINI_API_KEY absente ou invalide (format attendu: commence par "AIza")' : null;
     if (hasValidGeminiKey()) {
       for (const modelToTry of modelCandidates) {
         try {
@@ -419,7 +420,9 @@ app.post('/api/coach/chat', async (req, res) => {
             break; // Successfully obtained a response!
           }
         } catch (mErr: any) {
-          const errMsg = String(mErr?.message || '');
+          const errMsg = String(mErr?.message || mErr || '');
+          console.error(`[Coach Chat] Échec de l'appel Gemini (modèle: ${modelToTry}):`, errMsg);
+          debugLastError = `[${modelToTry}] ${errMsg}`;
           const isAuthError =
             mErr?.status === 401 ||
             mErr?.status === 403 ||
@@ -437,6 +440,9 @@ app.post('/api/coach/chat', async (req, res) => {
 
       if (!currentResponse?.text) {
         geminiError = true;
+        if (!debugLastError) {
+          debugLastError = `Boucle d'outils terminée sans texte final après ${MAX_TOOL_TURNS} tours max (loopCount=${loopCount}), aucune exception levée.`;
+        }
       }
     }
 
@@ -466,6 +472,9 @@ app.post('/api/coach/chat', async (req, res) => {
       compactTradingContext,
       model: chosenModel,
       tradesEvaluatedCount: trades.length,
+      // --- DIAGNOSTIC TEMPORAIRE : à retirer une fois le bug élucidé ---
+      engineUsed: currentResponse?.text ? 'gemini' : 'smart-fallback-local',
+      debugGeminiError: geminiError ? debugLastError : null,
     });
   } catch (error: any) {
     console.log('[Coach Chat] Handled exception:', error instanceof Error ? error.message : 'Unknown chat error');
